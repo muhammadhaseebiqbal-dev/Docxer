@@ -1,16 +1,29 @@
 import React, { useState } from 'react';
-import { FileText, Github, Sparkles, Download } from 'lucide-react';
+import { FileText, Github, Sparkles, Download, ArrowLeft } from 'lucide-react';
+import UploadModeSelector from './components/UploadModeSelector';
 import FileUpload from './components/FileUpload';
+import ProjectUpload from './components/ProjectUpload';
 import ProcessingStatus from './components/ProcessingStatus';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/ui/card';
 import { apiService } from './services/api';
+import { projectApiService } from './services/projectApi';
 
 const App = () => {
+  const [mode, setMode] = useState(null); // 'single' or 'project'
   const [selectedFile, setSelectedFile] = useState(null);
+  const [projectData, setProjectData] = useState(null);
   const [status, setStatus] = useState(null);
   const [taskId, setTaskId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleModeSelect = (selectedMode) => {
+    setMode(selectedMode);
+    setSelectedFile(null);
+    setProjectData(null);
+    setStatus(null);
+    setTaskId(null);
+  };
 
   const handleFileSelect = (file) => {
     setSelectedFile(file);
@@ -18,7 +31,13 @@ const App = () => {
     setTaskId(null);
   };
 
-  const handleUpload = async () => {
+  const handleProjectSelect = (data) => {
+    setProjectData(data);
+    setStatus(null);
+    setTaskId(null);
+  };
+
+  const handleSingleFileUpload = async () => {
     if (!selectedFile) return;
 
     setIsProcessing(true);
@@ -26,7 +45,6 @@ const App = () => {
       const response = await apiService.uploadFile(selectedFile);
       setTaskId(response.task_id);
       
-      // Start polling for status
       apiService.pollStatus(response.task_id, (statusUpdate) => {
         setStatus(statusUpdate);
         if (statusUpdate.status === 'completed' || statusUpdate.status === 'error') {
@@ -43,11 +61,71 @@ const App = () => {
     }
   };
 
+  const handleProjectUpload = async () => {
+    if (!projectData) return;
+
+    setIsProcessing(true);
+    try {
+      // Start project session
+      const sessionResponse = await projectApiService.startProjectSession();
+      const sessionId = sessionResponse.session_id;
+
+      // Update progress
+      setStatus({
+        status: 'processing',
+        progress: 10,
+        message: 'Starting project analysis...'
+      });
+
+      // Upload package.json
+      await projectApiService.uploadPackageJson(sessionId, projectData.packageJsonFile);
+      
+      setStatus({
+        status: 'processing',
+        progress: 30,
+        message: 'Package.json uploaded, analyzing dependencies...'
+      });
+
+      // Upload component
+      await projectApiService.uploadComponent(sessionId, projectData.componentFile);
+      
+      setStatus({
+        status: 'processing',
+        progress: 50,
+        message: 'Component uploaded, generating documentation...'
+      });
+
+      // Generate documentation
+      const response = await projectApiService.generateProjectDocumentation(sessionId);
+      setTaskId(response.task_id);
+      
+      // Poll for completion
+      projectApiService.pollStatus(response.task_id, (statusUpdate) => {
+        setStatus(statusUpdate);
+        if (statusUpdate.status === 'completed' || statusUpdate.status === 'error') {
+          setIsProcessing(false);
+        }
+      });
+
+    } catch (error) {
+      setStatus({
+        status: 'error',
+        message: error.message,
+        progress: 0
+      });
+      setIsProcessing(false);
+    }
+  };
+
   const handleDownload = async () => {
     if (!taskId) return;
     
     try {
-      await apiService.downloadDocument(taskId);
+      if (mode === 'single') {
+        await apiService.downloadDocument(taskId);
+      } else {
+        await projectApiService.downloadDocument(taskId);
+      }
     } catch (error) {
       setStatus(prev => ({
         ...prev,
@@ -57,7 +135,17 @@ const App = () => {
   };
 
   const handleReset = () => {
+    setMode(null);
     setSelectedFile(null);
+    setProjectData(null);
+    setStatus(null);
+    setTaskId(null);
+    setIsProcessing(false);
+  };
+
+  const handleBackToMode = () => {
+    setSelectedFile(null);
+    setProjectData(null);
     setStatus(null);
     setTaskId(null);
     setIsProcessing(false);
@@ -79,17 +167,26 @@ const App = () => {
               </div>
             </div>
             
-            <Button variant="outline" size="sm" asChild>
-              <a 
-                href="https://github.com/yourusername/docxer" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center space-x-2"
-              >
-                <Github className="h-4 w-4" />
-                <span>GitHub</span>
-              </a>
-            </Button>
+            <div className="flex items-center space-x-3">
+              {mode && !status && (
+                <Button variant="outline" size="sm" onClick={handleBackToMode}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              )}
+              
+              <Button variant="outline" size="sm" asChild>
+                <a 
+                  href="https://github.com/yourusername/docxer" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-2"
+                >
+                  <Github className="h-4 w-4" />
+                  <span>GitHub</span>
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -97,80 +194,80 @@ const App = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Hero Section */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <h2 className="text-4xl font-bold">Generate Documentation Instantly</h2>
-          </div>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Upload your code files and let AI create comprehensive, professional documentation in seconds.
-          </p>
-        </div>
-
-        {/* Features Cards */}
-        {!selectedFile && !status && (
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <span>Multiple Languages</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  Support for Python, JavaScript, TypeScript, Java, C++, and more programming languages.
-                </CardDescription>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <span>AI-Powered</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  Advanced AI analyzes your code structure, functions, and logic to create detailed documentation.
-                </CardDescription>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Download className="h-5 w-5 text-primary" />
-                  <span>Professional Output</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>
-                  Get well-formatted Word documents with proper headings, code blocks, and explanations.
-                </CardDescription>
-              </CardContent>
-            </Card>
+        {!mode && (
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <Sparkles className="h-8 w-8 text-primary" />
+              <h2 className="text-4xl font-bold">Generate Documentation Instantly</h2>
+            </div>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Upload your code files and let AI create comprehensive, professional documentation in seconds.
+            </p>
           </div>
         )}
 
-        {/* File Upload */}
-        <FileUpload 
-          onFileSelect={handleFileSelect} 
-          disabled={isProcessing}
-        />
+        {/* Mode Selection */}
+        {!mode && (
+          <UploadModeSelector onModeSelect={handleModeSelect} />
+        )}
 
-        {/* Upload Button */}
-        {selectedFile && !status && (
-          <div className="text-center mt-6">
-            <Button 
-              onClick={handleUpload} 
+        {/* Single File Upload */}
+        {mode === 'single' && !status && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">Single File Documentation</h2>
+              <p className="text-muted-foreground">
+                Upload any code file to generate comprehensive documentation
+              </p>
+            </div>
+            
+            <FileUpload 
+              onFileSelect={handleFileSelect} 
               disabled={isProcessing}
-              size="lg"
-              className="px-8"
-            >
-              {isProcessing ? 'Processing...' : 'Generate Documentation'}
-            </Button>
+            />
+
+            {selectedFile && (
+              <div className="text-center">
+                <Button 
+                  onClick={handleSingleFileUpload} 
+                  disabled={isProcessing}
+                  size="lg"
+                  className="px-8"
+                >
+                  {isProcessing ? 'Processing...' : 'Generate Documentation'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Project Upload */}
+        {mode === 'project' && !status && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">React Project Documentation</h2>
+              <p className="text-muted-foreground">
+                Upload your package.json and main component for comprehensive project analysis
+              </p>
+            </div>
+            
+            <ProjectUpload 
+              onProjectSelect={handleProjectSelect} 
+              disabled={isProcessing}
+            />
+
+            {projectData && (
+              <div className="text-center">
+                <Button 
+                  onClick={handleProjectUpload} 
+                  disabled={isProcessing}
+                  size="lg"
+                  className="px-8 bg-green-600 hover:bg-green-700"
+                >
+                  {isProcessing ? 'Processing Project...' : 'Generate Project Documentation'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
