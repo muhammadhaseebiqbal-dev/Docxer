@@ -1,0 +1,45 @@
+# Environment variables (root level)
+.env
+
+# Python virtual environment (root level)
+venv/
+.venv/
+
+# Python cache files (root level)
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Logs
+*.log
+
+# Old main.py (original tkinter version)
+main.py
+
+# Test files
+test_*.py
+
+# Documentation output (root level)
+*.docx
+*.pdf
+output.docx
+
+# Distribution files
+dist/
+build/

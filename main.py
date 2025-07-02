@@ -3,6 +3,13 @@ from tkinter.filedialog import askopenfilename
 import google.generativeai as genai
 import docx
 from docx import Document
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+# Load environment variables
+api_key = os.getenv("PYTHON_API_KEY")
 
 # This is the GUI code for the docxer app
 app = Tk()
@@ -24,7 +31,7 @@ fieldColor=("#ff8080")
 filePath = ""
 rawData = ""
 
-genai.configure(api_key="AIzaSyBwKG_fWrjZr82NQhLAry391f0P9rUP7vs")
+genai.configure(api_key=api_key)
 
 # Function to read code file
 def readCodefile(path):
