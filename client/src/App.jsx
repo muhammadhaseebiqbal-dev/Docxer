@@ -3,16 +3,19 @@ import { FileText, Github, Sparkles, Download, ArrowLeft } from 'lucide-react';
 import UploadModeSelector from './components/UploadModeSelector';
 import FileUpload from './components/FileUpload';
 import ProjectUpload from './components/ProjectUpload';
+import NodeProjectUpload from './components/NodeProjectUpload';
 import ProcessingStatus from './components/ProcessingStatus';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/ui/card';
 import { apiService } from './services/api';
 import { projectApiService } from './services/projectApi';
+import { nodeProjectApiService } from './services/nodeProjectApi';
 
 const App = () => {
-  const [mode, setMode] = useState(null); // 'single' or 'project'
+  const [mode, setMode] = useState(null); // 'single', 'project', or 'node-project'
   const [selectedFile, setSelectedFile] = useState(null);
   const [projectData, setProjectData] = useState(null);
+  const [nodeProjectData, setNodeProjectData] = useState(null);
   const [status, setStatus] = useState(null);
   const [taskId, setTaskId] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -21,6 +24,7 @@ const App = () => {
     setMode(selectedMode);
     setSelectedFile(null);
     setProjectData(null);
+    setNodeProjectData(null);
     setStatus(null);
     setTaskId(null);
   };
@@ -33,6 +37,12 @@ const App = () => {
 
   const handleProjectSelect = (data) => {
     setProjectData(data);
+    setStatus(null);
+    setTaskId(null);
+  };
+
+  const handleNodeProjectSelect = (data) => {
+    setNodeProjectData(data);
     setStatus(null);
     setTaskId(null);
   };
@@ -117,14 +127,72 @@ const App = () => {
     }
   };
 
+  const handleNodeProjectUpload = async () => {
+    if (!nodeProjectData) return;
+
+    setIsProcessing(true);
+    try {
+      // Start Node project session
+      const sessionResponse = await nodeProjectApiService.startNodeProjectSession();
+      const sessionId = sessionResponse.session_id;
+
+      // Update progress
+      setStatus({
+        status: 'processing',
+        progress: 10,
+        message: 'Starting Node project analysis...'
+      });
+
+      // Upload package.json
+      await nodeProjectApiService.uploadPackageJson(sessionId, nodeProjectData.packageJsonFile);
+      
+      setStatus({
+        status: 'processing',
+        progress: 30,
+        message: 'Package.json uploaded, analyzing dependencies...'
+      });
+
+      // Upload server file
+      await nodeProjectApiService.uploadServerFile(sessionId, nodeProjectData.serverFile);
+      
+      setStatus({
+        status: 'processing',
+        progress: 50,
+        message: 'Server file uploaded, generating documentation...'
+      });
+
+      // Generate documentation
+      const response = await nodeProjectApiService.generateNodeProjectDocumentation(sessionId);
+      setTaskId(response.task_id);
+      
+      // Poll for completion
+      nodeProjectApiService.pollStatus(response.task_id, (statusUpdate) => {
+        setStatus(statusUpdate);
+        if (statusUpdate.status === 'completed' || statusUpdate.status === 'error') {
+          setIsProcessing(false);
+        }
+      });
+
+    } catch (error) {
+      setStatus({
+        status: 'error',
+        message: error.message,
+        progress: 0
+      });
+      setIsProcessing(false);
+    }
+  };
+
   const handleDownload = async () => {
     if (!taskId) return;
     
     try {
       if (mode === 'single') {
         await apiService.downloadDocument(taskId);
-      } else {
+      } else if (mode === 'project') {
         await projectApiService.downloadDocument(taskId);
+      } else {
+        await nodeProjectApiService.downloadDocument(taskId);
       }
     } catch (error) {
       setStatus(prev => ({
@@ -138,6 +206,7 @@ const App = () => {
     setMode(null);
     setSelectedFile(null);
     setProjectData(null);
+    setNodeProjectData(null);
     setStatus(null);
     setTaskId(null);
     setIsProcessing(false);
@@ -146,6 +215,7 @@ const App = () => {
   const handleBackToMode = () => {
     setSelectedFile(null);
     setProjectData(null);
+    setNodeProjectData(null);
     setStatus(null);
     setTaskId(null);
     setIsProcessing(false);
@@ -265,6 +335,36 @@ const App = () => {
                   className="px-8 bg-green-600 hover:bg-green-700"
                 >
                   {isProcessing ? 'Processing Project...' : 'Generate Project Documentation'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Node Project Upload */}
+        {mode === 'node-project' && !status && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">Node.js Project Documentation</h2>
+              <p className="text-muted-foreground">
+                Upload your package.json and server file for comprehensive project analysis
+              </p>
+            </div>
+            
+            <NodeProjectUpload 
+              onUpload={handleNodeProjectSelect} 
+              disabled={isProcessing}
+            />
+
+            {nodeProjectData && (
+              <div className="text-center">
+                <Button 
+                  onClick={handleNodeProjectUpload} 
+                  disabled={isProcessing}
+                  size="lg"
+                  className="px-8 bg-blue-600 hover:bg-blue-700"
+                >
+                  {isProcessing ? 'Processing Node Project...' : 'Generate Node Project Documentation'}
                 </Button>
               </div>
             )}

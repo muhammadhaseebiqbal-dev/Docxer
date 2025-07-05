@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Package, ArrowRight } from 'lucide-react';
+import { FileText, Package, ArrowRight, Server } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -31,6 +31,19 @@ const UploadModeSelector = ({ onModeSelect }) => {
         'Architecture and dependency insights'
       ],
       buttonText: 'Upload Project Files'
+    },
+    {
+      id: 'node-project',
+      title: 'Node.js Express + MongoDB API',
+      description: 'Upload package.json + server files for comprehensive API documentation',
+      icon: Server,
+      features: [
+        'Complete API documentation',
+        'Express routes and middleware analysis',
+        'MongoDB schema documentation',
+        'Environment and deployment guide'
+      ],
+      buttonText: 'Upload API Project'
     }
   ];
 
@@ -43,7 +56,7 @@ const UploadModeSelector = ({ onModeSelect }) => {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {modes.map((mode) => (
           <Card 
             key={mode.id}

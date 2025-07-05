@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from utils.config import settings
 import asyncio
-from typing import Optional
+from typing import Optional, List, Dict
 
 class LLMService:
     def __init__(self):
@@ -198,6 +198,196 @@ Make the documentation professional, clear, and well-structured. Focus on practi
         except Exception as e:
             raise Exception(f"LLM generation failed: {str(e)}")
     
+    async def generate_node_project_documentation(self, package_json_content: str, server_content: str, server_filename: str, additional_files: Optional[List[Dict[str, str]]] = None) -> str:
+        """Generate documentation for Node.js Express + MongoDB API project"""
+        
+        # Parse package.json for tech stack analysis
+        try:
+            import json
+            package_data = json.loads(package_json_content)
+        except:
+            package_data = {}
+        
+        # Prepare additional files content
+        additional_files_text = ""
+        if additional_files:
+            for file_data in additional_files:
+                additional_files_text += f"\n\n{file_data['filename']}:\n```javascript\n{file_data['content']}\n```"
+        
+        prompt = f"""
+You are an expert technical writer creating professional documentation for a Node.js Express API project with MongoDB.
+
+IMPORTANT FORMATTING RULES:
+- Use ## for main section headings
+- Use ### for subsections  
+- Use - for bullet points
+- For code blocks, use ```javascript, ```json, or ```bash at the start and ``` at the end
+- Keep paragraphs concise and professional
+
+PROJECT CONTEXT:
+Package.json content:
+```json
+{package_json_content}
+```
+
+Main Server File ({server_filename}):
+```javascript
+{server_content}
+```
+
+Additional Files:
+{additional_files_text}
+
+Generate comprehensive API documentation with these sections:
+
+## Project Overview
+Analyze the package.json and server file to describe:
+- Project name and purpose
+- API type (REST, GraphQL, etc.)
+- Main technologies and versions (Node.js, Express, MongoDB, etc.)
+- Key features inferred from dependencies
+
+## Technology Stack
+
+### Backend Technologies
+Based on package.json dependencies, describe:
+- Node.js version and runtime
+- Express.js framework version
+- Database technology (MongoDB, Mongoose, etc.)
+- Authentication and security libraries
+- Development tools and middleware
+- Testing frameworks
+- Additional libraries and their purposes
+
+### Database Schema
+If Mongoose models are present in additional files:
+- Database structure
+- Model relationships
+- Schema definitions
+
+## API Architecture
+
+### Server Structure
+Analyze the main server file to describe:
+- Server configuration and setup
+- Port and environment configuration
+- Middleware usage
+- Database connection setup
+- Error handling approach
+
+### API Endpoints
+From server file and additional files, document:
+- Available routes and methods
+- Request/response formats
+- Authentication requirements
+- Parameters and query strings
+
+## Key Dependencies Analysis
+From package.json, highlight important dependencies:
+- Production dependencies and their roles
+- Development dependencies and build tools
+- Security-related packages
+- Version information for critical packages
+
+## Setup and Installation
+
+```bash
+# Installation commands based on package.json
+npm install
+# or
+yarn install
+
+# Environment setup
+cp .env.example .env
+# Edit .env with your configuration
+
+# Database setup (if MongoDB)
+# Start MongoDB service
+mongod
+
+# Start development server
+npm run dev
+# or
+yarn dev
+
+# Start production server
+npm start
+# or
+yarn start
+```
+
+## Environment Variables
+Based on the server configuration, list required environment variables:
+- Database connection strings
+- API keys and secrets
+- Port configurations
+- JWT secrets (if applicable)
+
+## API Documentation
+
+### Authentication
+If authentication is implemented:
+- Authentication method (JWT, sessions, etc.)
+- Login/register endpoints
+- Token usage
+
+### Endpoints
+Document all available endpoints with:
+- HTTP method and route
+- Description
+- Request parameters
+- Request body (if applicable)
+- Response format
+- Status codes
+
+## Database Structure
+If MongoDB/Mongoose is used:
+- Collection schemas
+- Relationships between collections
+- Indexing strategy
+
+## Security Features
+Based on dependencies and code:
+- Security middleware used
+- Input validation
+- Error handling
+- Rate limiting (if applicable)
+
+## Testing
+If test dependencies are found:
+- Testing framework used
+- Test structure
+- How to run tests
+
+## Deployment
+- Production considerations
+- Environment setup
+- Database deployment
+- Monitoring and logging
+
+## Development Notes
+- Code organization patterns
+- Best practices demonstrated
+- Performance considerations
+- Error handling strategies
+
+Make the documentation professional, actionable, and focused on helping developers understand and work with this Node.js API project.
+"""
+
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, 
+                lambda: self.model.generate_content(prompt)
+            )
+            
+            if not response.text:
+                raise Exception("Empty response from LLM")
+                
+            return response.text
+            
+        except Exception as e:
+            raise Exception(f"LLM generation failed: {str(e)}")
+
     def _create_system_prompt(self) -> str:
         """Create system prompt for consistent documentation"""
         return """
