@@ -1,0 +1,2 @@
+# Runtime for Vercel
+python-3.11.0
