@@ -24,7 +24,7 @@ fieldColor=("#ff8080")
 filePath = ""
 rawData = ""
 
-genai.configure(api_key="AIzaSyBwKG_fWrjZr82NQhLAry391f0P9rUP7vs")
+genai.configure(api_key="place your api key here")
 
 # Function to read code file
 def readCodefile(path):
